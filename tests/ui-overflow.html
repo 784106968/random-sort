@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>溢出检查</title>
+<style>body{font:13px monospace;padding:12px;white-space:pre-wrap}iframe{position:absolute;left:-4000px;top:0;border:0}</style>
+</head><body>
+<pre id="out">running…</pre>
+<div id="frames"></div>
+<script>
+const lines = [];
+const out = document.getElementById('out');
+const tick = (ms) => new Promise((r) => setTimeout(r, ms || 60));
+const views = ['', 'view=edit', 'view=confirm', 'view=result'];
+const widths = [320, 375, 414, 768, 1024, 1440];
+
+window.addEventListener('load', async () => {
+  let bad = 0;
+  for (const w of widths) {
+    for (const v of views) {
+      const f = document.createElement('iframe');
+      const q = ['demo=1', v].filter(Boolean).join('&');
+      f.src = '../index.html?' + q;
+      f.width = w;
+      f.height = 900;
+      document.getElementById('frames').appendChild(f);
+      await new Promise((r) => { f.onload = r; setTimeout(r, 1500); });
+      await tick(180);
+      const d = f.contentDocument;
+      const de = d.documentElement;
+      const scrollW = Math.max(de.scrollWidth, d.body.scrollWidth);
+      const clientW = de.clientWidth;
+      const overflow = scrollW - clientW;
+      const ok = overflow <= 0;
+      if (!ok) bad++;
+      lines.push((ok ? 'OK   ' : 'BAD  ') + w + 'px  ' + (v || 'upload') + '  scrollWidth=' + scrollW + ' clientWidth=' + clientW + (ok ? '' : '  overflow=' + overflow));
+      out.textContent = lines.join('\n');
+      f.remove();
+    }
+  }
+  lines.push('');
+  lines.push(bad === 0 ? 'NO-HORIZONTAL-OVERFLOW' : bad + ' OVERFLOWING VIEWS');
+  out.textContent = lines.join('\n');
+  document.title = bad === 0 ? 'OVERFLOW-OK' : 'OVERFLOW-BAD';
+});
+</script>
+</body></html>

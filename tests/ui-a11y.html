@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>可访问性检查</title>
+<style>body{font:12px monospace;padding:12px;white-space:pre-wrap}iframe{position:absolute;left:-4000px;border:0}</style>
+</head><body>
+<pre id="out">running…</pre>
+<div id="frames"></div>
+<script>
+const lines = [];
+const out = document.getElementById('out');
+const tick = (ms) => new Promise((r) => setTimeout(r, ms || 60));
+
+function relLum(rgb) {
+  const [r, g, b] = rgb.map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function parseColor(str) {
+  const m = str.match(/rgba?\(([^)]+)\)/);
+  if (!m) return null;
+  const parts = m[1].split(/[, /]+/).map(Number);
+  return { rgb: parts.slice(0, 3), a: parts.length > 3 ? parts[3] : 1 };
+}
+function effectiveBg(node, win) {
+  let cur = node;
+  while (cur && cur !== win.document.documentElement) {
+    const c = parseColor(win.getComputedStyle(cur).backgroundColor);
+    if (c && c.a > 0.5) return c.rgb;
+    cur = cur.parentElement;
+  }
+  return [255, 255, 255];
+}
+function contrast(fg, bg) {
+  const l1 = relLum(fg), l2 = relLum(bg);
+  const hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+window.addEventListener('load', async () => {
+  for (const view of ['', 'view=edit', 'view=confirm', 'view=result']) {
+    const f = document.createElement('iframe');
+    f.width = 1440; f.height = 1000;
+    f.src = '../index.html?' + ['demo=1', view].filter(Boolean).join('&');
+    document.getElementById('frames').appendChild(f);
+    await new Promise((r) => { f.onload = r; setTimeout(r, 2000); });
+    await tick(200);
+    const win = f.contentWindow;
+    const doc = win.document;
+    const tag = view || 'upload';
+
+    // 标题层级
+    const hs = Array.from(doc.querySelectorAll('h1,h2,h3,h4,h5,h6'))
+      .filter((h) => h.offsetParent !== null || h.closest('[hidden]') === null)
+      .map((h) => Number(h.tagName[1]));
+    let jump = null;
+    for (let i = 1; i < hs.length; i++) if (hs[i] - hs[i - 1] > 1) jump = (hs[i - 1] + '->' + hs[i]);
+    lines.push((jump ? 'BAD  ' : 'OK   ') + tag + ' 标题层级 ' + hs.join(',') + (jump ? ' 跳级 ' + jump : ''));
+
+    // 交互元素可访问名
+    const clickable = Array.from(doc.querySelectorAll('button, a[href], input, [role="button"]'))
+      .filter((n) => n.offsetParent !== null && !n.closest('[hidden]'));
+    const unnamed = clickable.filter((n) => {
+      const label = (n.getAttribute('aria-label') || n.textContent || '').trim();
+      const labelled = n.id && doc.querySelector('label[for="' + n.id + '"]');
+      return !label && !labelled;
+    });
+    lines.push((unnamed.length ? 'BAD  ' : 'OK   ') + tag + ' 交互元素命名 ' + clickable.length + ' 个' +
+      (unnamed.length ? ' 未命名: ' + unnamed.map((n) => n.outerHTML.slice(0, 60)).join(' | ') : ''));
+
+    // 图片/图标
+    const svgNoLabel = Array.from(doc.querySelectorAll('svg')).filter((s) => !s.hasAttribute('aria-hidden') && !s.querySelector('title') && !s.closest('[aria-label]'));
+    lines.push((svgNoLabel.length ? 'WARN ' : 'OK   ') + tag + ' 装饰性 SVG 标记 ' + (svgNoLabel.length ? svgNoLabel.length + ' 个未标 aria-hidden' : '完整'));
+
+    // 文字对比度（正文/次要/计数/表头）
+    const samples = [
+      ['.intro p', '说明文字'],
+      ['.panel-head p', '面板说明'],
+      ['.stat-row dt', '状态标签'],
+      ['.stat-row dd', '状态值'],
+      ['.badge-dup', '重复徽标'],
+      ['.chip', '名单 chip'],
+      ['.result-num', '随机数'],
+      ['.idx', '行号'],
+      ['.link-btn', '文字按钮'],
+      ['.count-pill', '人数胶囊'],
+      ['.dz-hint', '上传提示'],
+      ['.rules li', '规则文本'],
+      ['.rank', '名次块'],
+      ['.toast', '提示条']
+    ];
+    const fails = [];
+    samples.forEach(([sel, name]) => {
+      const node = doc.querySelector(sel);
+      if (!node || node.offsetParent === null) return;
+      const st = win.getComputedStyle(node);
+      const fg = parseColor(st.color);
+      if (!fg) return;
+      const bg = effectiveBg(node, win);
+      const ratio = contrast(fg.rgb, bg);
+      const size = parseFloat(st.fontSize);
+      const bold = Number(st.fontWeight) >= 700;
+      const need = size >= 24 || (size >= 18.66 && bold) ? 3 : 4.5;
+      if (ratio < need) fails.push(name + ' ' + ratio.toFixed(2) + ':' + need);
+    });
+    lines.push((fails.length ? 'BAD  ' : 'OK   ') + tag + ' 对比度' + (fails.length ? ' ' + fails.join('; ') : '全部达标'));
+
+    // 焦点可见性：所有可聚焦元素不应 outline:none 且无替代
+    const noFocusStyle = Array.from(doc.querySelectorAll('button, input, a[href], [tabindex="0"]'))
+      .filter((n) => n.offsetParent !== null)
+      .filter((n) => {
+        n.focus();
+        const st = win.getComputedStyle(n);
+        const hasRing = st.outlineStyle !== 'none' && parseFloat(st.outlineWidth) > 0;
+        const hasShadow = st.boxShadow && st.boxShadow !== 'none';
+        return !hasRing && !hasShadow;
+      });
+    lines.push((noFocusStyle.length ? 'BAD  ' : 'OK   ') + tag + ' 焦点可见 ' +
+      (noFocusStyle.length ? noFocusStyle.map((n) => n.tagName + '.' + n.className).join(' | ') : '全部可聚焦元素均有焦点样式'));
+
+    out.textContent = lines.join('\n');
+    f.remove();
+  }
+  lines.push('');
+  out.textContent = lines.join('\n');
+  document.title = 'A11Y-DONE';
+});
+</script>
+</body></html>

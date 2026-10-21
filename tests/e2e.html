@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>E2E</title>
+<style>body{font:13px monospace;white-space:pre-wrap;padding:12px} .ok{color:#0a0} .bad{color:#c00}</style>
+</head>
+<body>
+<pre id="out">running…</pre>
+<iframe id="frame" src="../index.html?demo=1" width="1200" height="900" style="position:fixed;left:-3000px;top:0"></iframe>
+<script>
+const out = document.getElementById('out');
+const lines = [];
+let failures = 0;
+function log(ok, label, extra) {
+  if (!ok) failures++;
+  lines.push((ok ? 'PASS ' : 'FAIL ') + label + (extra ? ' :: ' + extra : ''));
+  out.textContent = lines.join('\n');
+}
+const tick = (ms) => new Promise((r) => setTimeout(r, ms || 40));
+async function waitFor(fn, ms) {
+  const deadline = Date.now() + (ms || 2000);
+  while (Date.now() < deadline) {
+    try { if (fn()) return true; } catch (e) {}
+    await tick(30);
+  }
+  return false;
+}
+
+function fileFrom(text, name, type) {
+  return new File([text], name, { type: type || 'text/plain' });
+}
+function upload(win, file) {
+  const input = win.document.getElementById('file-input');
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+async function uploadAndWait(win, file, predicate) {
+  upload(win, file);
+  return waitFor(predicate || (() => !win.document.getElementById('step-2').hidden), 3000);
+}
+
+window.addEventListener('load', async () => {
+  const frame = document.getElementById('frame');
+  const win = frame.contentWindow;
+  const doc = win.document;
+  const $ = (s) => doc.querySelector(s);
+  const $$ = (s) => Array.from(doc.querySelectorAll(s));
+  const visible = (id) => !doc.getElementById(id).hidden;
+
+  await tick(200);
+
+  // ---- 0. 初始状态 ----
+  log(visible('step-1') && !visible('step-2'), '初始只显示第 1 步');
+  log($('#result-list').children.length === 0, '初始没有排序结果');
+
+  // ---- 1. 未确认前不能抽取 ----
+  $('#draw-btn').click();
+  await tick();
+  log(!visible('step-4'), '未确认名单时点击抽取不会进入结果页');
+
+  // ---- 2. 上传 txt ----
+  await uploadAndWait(win, fileFrom('张三\n李四\n\n 王五 \n张三\n', '名单.txt'));
+  log(visible('step-2'), 'txt 上传后进入校对页');
+  const names = $$('#people-list .name-input').map((i) => i.value);
+  log(names.length === 4, 'txt 解析人数正确（4）', JSON.stringify(names));
+  log(names.join(',') === '张三,李四,王五,张三', 'txt 姓名与去空白正确', JSON.stringify(names));
+  log($('#people-count').textContent.trim() === '4 人', '人数展示正确', $('#people-count').textContent);
+  log(!$('#dup-pill').hidden && $('#dup-pill').textContent.includes('1'), '重复姓名被标记', $('#dup-pill').textContent);
+
+  // ---- 3. 修改名单 ----
+  const first = $$('#people-list .name-input')[0];
+  first.value = '张三丰';
+  first.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+  log($$('#people-list .name-input')[0].value === '张三丰', '姓名可就地修改');
+
+  // 新增空白行 -> 阻止进入下一步
+  $('#add-btn').click();
+  await tick();
+  log($('#to-confirm').disabled === true, '存在空白姓名时禁用下一步');
+  log(!$('#edit-error').hidden, '空白姓名给出内联错误提示');
+  const rows = $$('#people-list .person-row');
+  const lastInput = rows[rows.length - 1].querySelector('.name-input');
+  lastInput.value = '周九';
+  lastInput.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+  log($('#to-confirm').disabled === false, '补全姓名后恢复可用');
+
+  // 删除一行
+  const before = $$('#people-list .person-row').length;
+  $$('#people-list .person-row')[3].querySelector('[data-action="delete"]').click();
+  await tick();
+  log($$('#people-list .person-row').length === before - 1, '可删除人员');
+
+  const finalNames = $$('#people-list .name-input').map((i) => i.value);
+  log(finalNames.length === 4, '最终人数 4', JSON.stringify(finalNames));
+  log(finalNames[0] === '张三丰', '修改结果保留在名单里', finalNames[0]);
+
+  // ---- 4. 确认 -> 第 3 步，仍未抽取 ----
+  $('#to-confirm').click();
+  await tick();
+  log(visible('step-3') && !visible('step-4'), '确认后进入第 3 步，尚未排序');
+  log($$('#confirm-chips .chip').map((c) => c.textContent).join(',') === finalNames.join(','), '确认页渲染的是修改后的名单');
+
+  // ---- 5. 抽取与排序 ----
+  $('#draw-btn').click();
+  await tick(120);
+  log(visible('step-4'), '抽取后进入结果页');
+  const resultRows = $$('#result-list .result-row');
+  log(resultRows.length === 4, '结果条数等于人数', String(resultRows.length));
+  const ranks = resultRows.map((r) => Number(r.querySelector('.rank').textContent));
+  log(ranks.join(',') === '1,2,3,4', '次序连续从 1 开始', ranks.join(','));
+  const nums = resultRows.map((r) => Number(r.querySelector('.result-num').textContent));
+  log(new Set(nums).size === nums.length, '随机数互不相同', nums.join(','));
+  log(nums.every((v, i) => i === 0 || nums[i - 1] >= v), '默认按随机数从大到小', nums.join(','));
+  const resultNames = resultRows.map((r) => r.querySelector('.result-name').firstChild.textContent);
+  log(finalNames.slice().sort().join(',') === resultNames.slice().sort().join(','), '结果包含修改后的全部人员', resultNames.join(','));
+  log(resultNames.includes('张三丰'), '修改后的姓名进入排序结果');
+
+  // ---- 6. 切换升序 ----
+  doc.querySelector('.segmented button[data-dir="asc"]').click();
+  await tick();
+  const ascNums = $$('#result-list .result-num').map((n) => Number(n.textContent));
+  log(ascNums.every((v, i) => i === 0 || ascNums[i - 1] <= v), '可切换为从小到大', ascNums.join(','));
+
+  // ---- 7. 未确认不抽取 / 返回修改使结果作废 ----
+  $('#back-to-edit-2').click();
+  await tick();
+  log(visible('step-2') && !visible('step-4'), '返回修改后离开结果页');
+  // 返回名单页后，直接触发抽取按钮不应产生结果（确认状态已失效）
+  $('#draw-btn').click();
+  await tick(60);
+  log(!visible('step-4') && $('#result-list').children.length > 0, '返回修改后抽取按钮失效（需重新确认）');
+  $('#to-confirm').click();
+  await tick();
+  $('#draw-btn').click();
+  await tick(80);
+  const reNums = $$('#result-list .result-num').map((n) => n.textContent);
+  log(reNums.length === 4, '重新确认后可再次抽取');
+
+  // ---- 8. 空文件提示 ----
+  $('#back-to-upload').click();
+  await tick();
+  upload(win, fileFrom('', '空.txt'));
+  log(await waitFor(() => !$('#upload-error').hidden, 3000), '空文件触发提示');
+  log($('#upload-error').textContent.includes('空'), '空文件提示文案正确', $('#upload-error').textContent.trim());
+  log(!visible('step-2'), '空文件不进入校对页');
+
+  // ---- 9. 仅空白行的 txt ----
+  upload(win, fileFrom('\n\n   \n\t\n', '空白.txt'));
+  log(await waitFor(() => $('#upload-error').textContent.includes('没有解析到'), 3000), '无有效姓名给出提示', $('#upload-error').textContent.trim());
+
+  // ---- 10. 不支持的扩展名 ----
+  upload(win, fileFrom('a,b', '名单.csv', 'text/csv'));
+  log(await waitFor(() => $('#upload-error').textContent.includes('不支持'), 3000), '不支持的格式给出提示');
+
+  // ---- 11. JSON 上传 + 去重 ----
+  await uploadAndWait(win, fileFrom(JSON.stringify([{ name: '甲' }, { name: '乙' }, { name: '甲' }, { name: '丙' }]), '名单.json', 'application/json'));
+  log(visible('step-2'), 'json 上传后进入校对页');
+  log($$('#people-list .name-input').length === 4, 'json 解析 4 人');
+  log(!$('#dedupe-btn').hidden, '出现去重按钮');
+  $('#dedupe-btn').click();
+  await tick();
+  log($$('#people-list .name-input').length === 3, '一键去重生效');
+  log($$('#people-list .name-input').map((i) => i.value).join(',') === '甲,乙,丙', '去重保留首次出现顺序');
+
+  // ---- 12. 批量编辑 ----
+  $('#batch-toggle').click();
+  await tick();
+  const ta = $('#batch-textarea');
+  log(ta.value.split('\n').length === 3, '批量编辑回填当前名单');
+  ta.value = '曹操\n刘备\n孙权\n曹操';
+  $('#batch-apply').click();
+  await tick();
+  const batchNames = $$('#people-list .name-input').map((i) => i.value);
+  log(batchNames.join(',') === '曹操,刘备,孙权,曹操', '批量编辑替换名单', batchNames.join(','));
+
+  // ---- 13. 导出文本格式 ----
+  $('#to-confirm').click();
+  await tick();
+  $('#draw-btn').click();
+  await tick(80);
+  const meta = $('#result-meta').textContent;
+  log(/4 人/.test(meta), '结果页显示人数与时间', meta);
+
+  // 完成
+  lines.push('');
+  lines.push(failures === 0 ? 'ALL PASS' : failures + ' FAILURES');
+  out.textContent = lines.join('\n');
+  document.title = failures === 0 ? 'E2E-ALL-PASS' : 'E2E-' + failures + '-FAIL';
+});
+</script>
+</body>
+</html>

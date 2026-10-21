@@ -1,0 +1,2118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>人员随机排序 · 名单解析与抽签</title>
+<style>
+/* ============================================================
+   Design tokens — flat design, blue primary + red destructive
+   ============================================================ */
+:root{
+  color-scheme: light;
+  --bg:#F7F9FE;
+  --surface:#FFFFFF;
+  --surface-2:#F1F5FD;
+  --surface-3:#E8EFFB;
+  --label:#0F172A;
+  --label-2:#475569;
+  --label-3:#64748B;
+  --border:#E4ECFC;
+  --border-strong:#C9D8F1;
+  --primary:#2563EB;
+  --primary-hover:#1D4ED8;
+  --on-primary:#FFFFFF;
+  --primary-soft:#EAF1FE;
+  --danger:#DC2626;
+  --danger-soft:#FEF2F2;
+  --danger-border:#FBD5D5;
+  --warn:#B45309;
+  --warn-soft:#FEF7EC;
+  --warn-border:#F6DFC0;
+  --success:#0F7A55;
+  --success-soft:#EDFAF4;
+  --success-border:#C7EBDC;
+  --ring:rgba(37,99,235,.35);
+  --shadow-none:none;
+  --r-sm:8px;
+  --r-md:12px;
+  --r-lg:16px;
+  --r-xl:20px;
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --font: Inter, "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#0B1220;
+    --surface:#111A2C;
+    --surface-2:#16223A;
+    --surface-3:#1C2B47;
+    --label:#E8EEFA;
+    --label-2:#A8B6CE;
+    --label-3:#8A99B4;
+    --border:#233250;
+    --border-strong:#33486D;
+    --primary:#60A5FA;
+    --primary-hover:#7DB7FC;
+    --on-primary:#081120;
+    --primary-soft:#16294A;
+    --danger:#F87171;
+    --danger-soft:#2A1618;
+    --danger-border:#4A2427;
+    --warn:#F0B269;
+    --warn-soft:#2A2014;
+    --warn-border:#4A3A20;
+    --success:#5FD3A6;
+    --success-soft:#12291F;
+    --success-border:#234A3A;
+    --ring:rgba(96,165,250,.45);
+  }
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--label);
+  font-family:var(--font);
+  font-size:15px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4{margin:0;line-height:1.3;letter-spacing:-.01em}
+p{margin:0}
+ul,ol{margin:0}
+button{font-family:inherit}
+input,textarea{font-family:inherit}
+[hidden]{display:none !important}
+svg{display:block;flex:none}
+::selection{background:var(--primary-soft);color:var(--label)}
+
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+.skip-link{
+  position:absolute;left:16px;top:-60px;z-index:100;
+  background:var(--primary);color:var(--on-primary);
+  padding:10px 16px;border-radius:0 0 var(--r-sm) var(--r-sm);
+  font-weight:600;font-size:14px;text-decoration:none;
+  transition:top .18s var(--ease);
+}
+.skip-link:focus{top:0}
+
+/* ============================================================
+   Top bar
+   ============================================================ */
+.topbar{
+  position:sticky;top:0;z-index:30;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+.topbar-inner{
+  max-width:1200px;margin:0 auto;padding:0 24px;
+  height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand-mark{
+  width:34px;height:34px;border-radius:10px;
+  background:var(--primary);color:var(--on-primary);
+  display:grid;place-items:center;flex:none;
+}
+.brand-text{min-width:0}
+.brand-title{font-size:15px;font-weight:650;letter-spacing:-.01em;line-height:1.2}
+.brand-sub{font-size:12px;color:var(--label-3);line-height:1.3}
+.topbar-meta{
+  display:flex;align-items:center;gap:8px;
+  font-size:12.5px;color:var(--label-3);
+}
+.topbar-meta .dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex:none}
+@media (max-width:640px){
+  .topbar-inner{padding:0 16px;height:58px}
+  .topbar-meta{display:none}
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.shell{max-width:1200px;margin:0 auto;padding:0 24px}
+@media (max-width:640px){ .shell{padding:0 16px} }
+
+.intro{padding:36px 0 0}
+.intro h1{font-size:clamp(23px,2.4vw,30px);font-weight:680}
+.intro p{color:var(--label-2);max-width:64ch;margin-top:8px;font-size:14.5px}
+
+/* Stepper */
+.steps{
+  position:relative;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:8px;list-style:none;padding:0;
+  margin:26px 0 22px;
+}
+.steps::before{
+  content:"";position:absolute;top:13px;left:12.5%;right:12.5%;
+  height:2px;background:var(--border);border-radius:2px;
+}
+.steps::after{
+  content:"";position:absolute;top:13px;left:12.5%;
+  height:2px;background:var(--primary);border-radius:2px;
+  width:calc(var(--progress,0) * 75%);
+  transition:width .35s var(--ease);
+}
+.step{position:relative;z-index:1;text-align:center;min-width:0}
+.step .dot{
+  width:28px;height:28px;margin:0 auto 8px;
+  border-radius:50%;display:grid;place-items:center;
+  background:var(--surface);border:2px solid var(--border-strong);
+  color:var(--label-3);font-size:12.5px;font-weight:700;
+  font-variant-numeric:tabular-nums;
+  transition:background-color .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease);
+}
+.step .txt{
+  display:block;font-size:12.5px;color:var(--label-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:color .2s var(--ease);
+}
+.step.is-done .dot{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.step.is-done .txt{color:var(--label-2)}
+.step.is-current .dot{border-color:var(--primary);color:var(--primary);background:var(--surface);box-shadow:0 0 0 4px var(--primary-soft)}
+.step.is-current .txt{color:var(--label);font-weight:600}
+@media (max-width:560px){
+  .steps{gap:2px;margin:20px 0 16px}
+  .step .txt{font-size:11.5px}
+  .step .dot{width:26px;height:26px;font-size:12px;margin-bottom:6px}
+  .steps::before,.steps::after{top:12px}
+}
+
+.workspace{
+  display:grid;grid-template-columns:minmax(0,1fr) 316px;
+  gap:24px;align-items:start;padding:0 0 72px;
+}
+@media (max-width:1023px){
+  .workspace{grid-template-columns:minmax(0,1fr);gap:20px}
+  .rail{order:2}
+}
+@media (max-width:640px){ .workspace{padding-bottom:48px} }
+
+.panel{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-xl);
+  padding:28px;
+  scroll-margin-top:84px;
+  min-width:0;
+}
+@media (max-width:640px){ .panel{padding:20px 18px;border-radius:var(--r-lg)} }
+
+.panel-head{margin-bottom:20px}
+.panel-head h2{
+  font-size:19px;font-weight:660;
+  display:flex;align-items:center;gap:10px;
+}
+/* 步骤标题只作为程序化焦点目标（aria 播报用），不在 Tab 序列内，
+   因此不画焦点环，避免整块蓝框被误认为输入框 */
+.panel-head h2:focus,.panel-head h2:focus-visible{outline:none}
+.panel-head p{color:var(--label-2);font-size:14px;margin-top:6px;max-width:68ch}
+.step-tag{
+  font-size:11.5px;font-weight:650;letter-spacing:.02em;
+  color:var(--primary);background:var(--primary-soft);
+  border-radius:999px;padding:2px 9px;white-space:nowrap;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:40px;padding:0 16px;border-radius:10px;
+  border:1px solid transparent;background:transparent;
+  font-size:14px;font-weight:600;letter-spacing:.01em;
+  color:var(--label);cursor:pointer;white-space:nowrap;
+  transition:background-color .16s var(--ease),border-color .16s var(--ease),
+             color .16s var(--ease),opacity .16s var(--ease);
+}
+.btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn svg{width:17px;height:17px}
+.btn-primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.btn-primary:hover:not(:disabled){background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn-secondary{background:var(--surface);border-color:var(--border-strong);color:var(--label)}
+.btn-secondary:hover:not(:disabled){background:var(--surface-2);border-color:var(--label-3)}
+.btn-ghost{color:var(--label-2)}
+.btn-ghost:hover:not(:disabled){background:var(--surface-2);color:var(--label)}
+.btn-danger-ghost{color:var(--danger)}
+.btn-danger-ghost:hover:not(:disabled){background:var(--danger-soft)}
+.btn-lg{height:46px;padding:0 22px;font-size:15px;border-radius:11px}
+.btn-sm{height:32px;padding:0 12px;font-size:13px;border-radius:8px}
+
+.link-btn{
+  background:none;border:none;padding:2px 0;
+  color:var(--primary);font-size:13.5px;font-weight:600;
+  cursor:pointer;border-bottom:1px solid transparent;
+  transition:border-color .15s var(--ease),color .15s var(--ease);
+}
+.link-btn:hover{border-bottom-color:currentColor}
+.link-btn:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px}
+
+.icon-btn{
+  width:34px;height:34px;display:grid;place-items:center;
+  border:1px solid transparent;border-radius:8px;background:transparent;
+  color:var(--label-3);cursor:pointer;
+  transition:background-color .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease);
+}
+.icon-btn:hover{background:var(--surface-3);color:var(--label)}
+.icon-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.icon-btn.danger:hover{background:var(--danger-soft);color:var(--danger)}
+.icon-btn svg{width:16px;height:16px}
+
+/* Segmented control */
+.segmented{
+  display:inline-flex;padding:3px;gap:2px;
+  background:var(--surface-2);border-radius:9px;border:1px solid var(--border);
+}
+.segmented button{
+  height:28px;padding:0 11px;border:none;border-radius:6px;background:transparent;
+  color:var(--label-2);font-size:12.5px;font-weight:600;cursor:pointer;
+  transition:background-color .15s var(--ease),color .15s var(--ease);
+}
+.segmented button:hover{color:var(--label)}
+.segmented button[aria-pressed="true"]{
+  background:var(--surface);color:var(--label);
+  box-shadow:0 1px 0 rgba(15,23,42,.06);
+}
+.segmented button:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+
+/* ============================================================
+   Dropzone
+   ============================================================ */
+.dropzone{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;text-align:center;
+  padding:40px 24px;
+  border:1.5px dashed var(--border-strong);
+  border-radius:var(--r-lg);
+  background:var(--bg);
+  transition:border-color .18s var(--ease),background-color .18s var(--ease);
+}
+.dropzone:hover,.dropzone.is-drag{
+  border-color:var(--primary);
+  background:var(--primary-soft);
+}
+.dropzone:focus-visible{
+  outline:2px solid var(--primary);
+  outline-offset:3px;
+  border-color:var(--primary);
+}
+.dropzone.is-drag{border-style:solid}
+.dz-icon{
+  width:46px;height:46px;border-radius:13px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--primary);display:grid;place-items:center;margin-bottom:8px;
+}
+.dz-icon svg{width:22px;height:22px}
+.dz-title{font-size:15px;font-weight:600}
+.dz-hint{font-size:12.5px;color:var(--label-3);margin-top:2px}
+.dropzone .btn{margin-top:10px}
+.dropzone:focus-within{border-color:var(--primary)}
+
+.format-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;
+}
+@media (max-width:700px){ .format-grid{grid-template-columns:1fr} }
+.format-card{
+  border:1px solid var(--border);border-radius:var(--r-md);
+  padding:14px 16px;background:var(--surface);min-width:0;
+}
+.format-card h3{
+  font-size:12.5px;font-weight:650;color:var(--label-2);
+  letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px;
+}
+.format-card pre{
+  margin:0;padding:10px 12px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--label-2);
+  font-family:var(--mono);font-size:12px;line-height:1.7;
+  overflow-x:auto;
+}
+.format-card p{font-size:12.5px;color:var(--label-3);margin-top:8px;line-height:1.55}
+
+.demo-row{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  margin-top:16px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:13px;color:var(--label-3);
+}
+
+/* ============================================================
+   Notices
+   ============================================================ */
+.notice{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:12px 14px;border-radius:var(--r-md);
+  border:1px solid var(--border);background:var(--surface-2);
+  font-size:13.5px;line-height:1.55;
+}
+.notice svg{width:17px;height:17px;margin-top:1px}
+.notice strong{font-weight:650}
+.notice-danger{background:var(--danger-soft);border-color:var(--danger-border);color:var(--danger)}
+.notice-warn{background:var(--warn-soft);border-color:var(--warn-border);color:var(--warn)}
+.notice-success{background:var(--success-soft);border-color:var(--success-border);color:var(--success)}
+.notice-info{background:var(--primary-soft);border-color:var(--border-strong);color:var(--label-2)}
+.notice + .notice{margin-top:10px}
+.notice-body{min-width:0}
+
+/* ============================================================
+   Step 2 — editable list
+   ============================================================ */
+.report{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;
+  padding:12px 14px;border-radius:var(--r-md);
+  background:var(--surface-2);border:1px solid var(--border);
+  font-size:13px;color:var(--label-2);margin-bottom:16px;
+}
+.report b{color:var(--label);font-weight:650}
+.report .sep{color:var(--border-strong)}
+.report .file-name{
+  font-family:var(--mono);font-size:12.5px;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+.list-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;margin-bottom:12px;
+}
+.toolbar-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.count-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  height:30px;padding:0 12px;border-radius:999px;
+  background:var(--primary-soft);color:var(--primary);
+  font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;
+}
+.badge-dup{
+  display:inline-flex;align-items:center;gap:4px;
+  height:20px;padding:0 7px;border-radius:6px;
+  background:var(--warn-soft);color:var(--warn);
+  border:1px solid var(--warn-border);
+  font-size:11.5px;font-weight:650;white-space:nowrap;
+}
+
+.people{
+  list-style:none;padding:2px;margin:0;
+  display:flex;flex-direction:column;gap:2px;
+  max-height:460px;overflow-y:auto;
+  border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface);
+}
+.people:empty{border-style:dashed}
+.person-row{
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) auto;
+  align-items:center;gap:8px;
+  padding:5px 8px 5px 4px;border-radius:var(--r-sm);
+  transition:background-color .14s var(--ease);
+}
+.person-row:hover{background:var(--surface-2)}
+.person-row:focus-within{background:var(--surface-2)}
+.idx{
+  font-size:12.5px;color:var(--label-3);text-align:right;
+  font-variant-numeric:tabular-nums;font-weight:600;
+  transition:color .15s var(--ease);
+}
+.person-row:focus-within .idx{color:var(--primary)}
+.name-input{
+  width:100%;height:36px;padding:0 10px;
+  border:1px solid var(--border);border-radius:6px;
+  background:var(--surface);color:var(--label);
+  font-size:14.5px;
+  transition:border-color .15s var(--ease),background-color .15s var(--ease),box-shadow .15s var(--ease);
+}
+.name-input:hover{border-color:var(--border-strong);background:var(--surface)}
+.name-input:focus{
+  outline:none;border-color:var(--primary);
+  background:var(--surface);
+  box-shadow:0 0 0 3px var(--ring);
+}
+.person-row:hover .name-input{border-color:var(--border-strong)}
+.name-input[aria-invalid="true"]{
+  border-color:var(--danger);background:var(--danger-soft);
+}
+.row-side{display:flex;align-items:center;gap:6px}
+
+.row-error{
+  grid-column:2 / -1;
+  font-size:12px;color:var(--danger);margin:-2px 0 2px 10px;
+}
+
+.list-empty{
+  padding:32px 20px;text-align:center;color:var(--label-3);font-size:13.5px;
+}
+
+.batch-editor{margin-bottom:14px}
+.batch-editor label{
+  display:block;font-size:13px;font-weight:600;color:var(--label-2);margin-bottom:6px;
+}
+.batch-editor textarea{
+  width:100%;min-height:220px;padding:12px 14px;
+  border:1px solid var(--border-strong);border-radius:var(--r-md);
+  background:var(--surface);color:var(--label);
+  font-family:var(--mono);font-size:13.5px;line-height:1.85;
+  resize:vertical;
+  transition:border-color .15s var(--ease),box-shadow .15s var(--ease);
+}
+.batch-editor textarea:focus{
+  outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--ring);
+}
+.batch-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* ============================================================
+   Step 3 — confirm
+   ============================================================ */
+.summary-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;
+}
+@media (max-width:560px){ .summary-grid{grid-template-columns:1fr 1fr} }
+.summary-item{
+  border:1px solid var(--border);border-radius:var(--r-md);
+  padding:12px 14px;background:var(--surface);min-width:0;
+}
+.summary-item dt{font-size:12px;color:var(--label-3);margin-bottom:3px}
+.summary-item dd{
+  margin:0;font-size:20px;font-weight:680;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.summary-item dd.small{font-size:13.5px;font-weight:600;font-family:var(--mono);color:var(--label-2)}
+
+.chips{
+  display:flex;flex-wrap:wrap;gap:6px;
+  padding:14px;border-radius:var(--r-md);
+  background:var(--surface-2);border:1px solid var(--border);
+  max-height:190px;overflow-y:auto;
+}
+.chip{
+  display:inline-flex;align-items:center;
+  height:26px;padding:0 9px;border-radius:6px;
+  background:var(--surface);border:1px solid var(--border);
+  font-size:13px;color:var(--label-2);
+  max-width:100%;
+}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.is-dup{border-color:var(--warn-border);background:var(--warn-soft);color:var(--warn)}
+.chips-more{font-size:12.5px;color:var(--label-3);padding:2px 4px}
+
+.method{margin-top:18px;padding:14px 16px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg)}
+.method h3{font-size:13px;font-weight:650;color:var(--label-2);margin-bottom:8px}
+.method ul{
+  margin:0;padding-left:18px;font-size:13px;color:var(--label-2);
+  display:flex;flex-direction:column;gap:4px;
+}
+.method code{
+  font-family:var(--mono);font-size:12px;
+  background:var(--surface-3);padding:1px 5px;border-radius:4px;color:var(--label);
+}
+
+.panel-actions{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:22px;padding-top:20px;border-top:1px solid var(--border);
+}
+.panel-actions .spacer{flex:1 1 auto}
+@media (max-width:520px){
+  .panel-actions{flex-direction:column-reverse;align-items:stretch}
+  .panel-actions .btn{width:100%}
+  .panel-actions .spacer{display:none}
+}
+
+/* ============================================================
+   Step 4 — results
+   ============================================================ */
+.result-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;margin-bottom:14px;
+}
+.results{
+  list-style:none;padding:0;margin:0;
+  display:flex;flex-direction:column;gap:6px;
+}
+.result-row{
+  display:grid;grid-template-columns:52px minmax(0,1fr) auto;
+  align-items:center;gap:14px;
+  padding:12px 16px 12px 12px;
+  border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface);
+  position:relative;overflow:hidden;
+  animation:rise .34s var(--ease) both;
+  animation-delay:calc(var(--i) * 26ms);
+}
+.result-row:hover{border-color:var(--border-strong);background:var(--surface-2)}
+.result-row::after{
+  content:"";position:absolute;left:0;bottom:0;height:2px;
+  width:calc(var(--v) * 100%);
+  background:var(--primary);opacity:.35;
+  transition:width .5s var(--ease);
+}
+.rank{
+  width:36px;height:36px;border-radius:10px;
+  display:grid;place-items:center;
+  background:var(--surface-2);color:var(--label-2);
+  font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;
+  justify-self:center;
+}
+.rank.top{background:var(--primary);color:var(--on-primary)}
+.result-main{min-width:0}
+.result-name{
+  font-size:15px;font-weight:600;letter-spacing:-.005em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.result-name .dup-mark{
+  font-size:11px;color:var(--warn);font-weight:600;
+  border:1px solid var(--warn-border);background:var(--warn-soft);
+  border-radius:5px;padding:0 5px;margin-left:6px;vertical-align:1px;
+}
+.result-num{
+  font-size:14px;font-weight:650;color:var(--label-2);
+  font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  padding-left:4px;
+}
+@keyframes rise{
+  from{opacity:0;transform:translateY(7px)}
+  to{opacity:1;transform:none}
+}
+@media (max-width:559px){
+  .result-row{grid-template-columns:44px minmax(0,1fr);row-gap:1px;padding:11px 12px 11px 8px}
+  .rank{width:32px;height:32px;font-size:13px}
+  .result-num{grid-column:2;justify-self:start;font-size:12.5px;padding-left:0}
+}
+
+.result-foot{
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  font-size:12.5px;color:var(--label-3);
+}
+.result-foot .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ============================================================
+   Rail
+   ============================================================ */
+.card{
+  border:1px solid var(--border);border-radius:var(--r-lg);
+  background:var(--surface);padding:18px;
+}
+.card + .card{margin-top:14px}
+.card h3{
+  font-size:12px;font-weight:650;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--label-3);margin-bottom:12px;
+}
+.stat-list{display:flex;flex-direction:column;gap:0;margin:0}
+.stat-row{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:7px 0;border-bottom:1px solid var(--border);
+  font-size:13px;
+}
+.stat-row:last-child{border-bottom:none;padding-bottom:0}
+.stat-row:first-child{padding-top:0}
+.stat-row dt{color:var(--label-3);white-space:nowrap}
+.stat-row dd{
+  margin:0;font-weight:600;color:var(--label);text-align:right;
+  font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.stat-row dd.muted{color:var(--label-3);font-weight:500}
+.rules{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px}
+.rules li{
+  display:flex;gap:9px;font-size:12.8px;color:var(--label-2);line-height:1.55;
+}
+.rules li svg{width:15px;height:15px;color:var(--primary);margin-top:2px;flex:none}
+.rules li b{color:var(--label);font-weight:600}
+
+.rail-progress{
+  height:4px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-bottom:14px;
+}
+.rail-progress span{
+  display:block;height:100%;background:var(--primary);border-radius:99px;
+  width:25%;transition:width .35s var(--ease);
+}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%,14px);
+  background:var(--label);color:var(--bg);
+  padding:10px 18px;border-radius:999px;
+  font-size:13.5px;font-weight:600;
+  opacity:0;pointer-events:none;z-index:80;
+  transition:opacity .18s var(--ease),transform .18s var(--ease);
+  max-width:calc(100vw - 32px);text-align:center;
+}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+/* Footer */
+.foot{
+  border-top:1px solid var(--border);
+  padding:20px 0 32px;margin-top:8px;
+  font-size:12.5px;color:var(--label-3);
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+
+/* ============================================================
+   Motion & demo capture
+   ============================================================ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-delay:0ms !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+.demo-mode *, .demo-mode *::before, .demo-mode *::after{
+  animation:none !important;transition:none !important;
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3h5v5"/><path d="M21 3 13 11"/><path d="M8 21H3v-5"/><path d="M3 21 11 13"/>
+          <path d="M16 21h5v-5"/><path d="M21 21 13 13"/><path d="M8 3H3v5"/><path d="M3 3l8 8"/>
+        </svg>
+      </span>
+      <span class="brand-text">
+        <span class="brand-title">人员随机排序</span>
+        <span class="brand-sub">名单解析 · 校对 · 抽签排序</span>
+      </span>
+    </div>
+    <div class="topbar-meta">
+      <span class="dot" aria-hidden="true"></span>
+      <span>全部在本地浏览器内完成，文件不会上传</span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="shell">
+    <section class="intro">
+      <h1>上传名单，核对无误后随机排序</h1>
+      <p>解析 txt / json 名单文件，逐条校对姓名，确认后为每人分配一个随机数，按随机数大小排出次序 —— 编辑改动会实时生效，未确认前不会进行任何抽取。</p>
+    </section>
+
+    <nav aria-label="操作进度">
+      <ol class="steps" id="steps" style="--progress:0">
+        <li class="step is-current" data-step="1" aria-current="step">
+          <span class="dot">1</span><span class="txt">上传文件</span>
+        </li>
+        <li class="step" data-step="2">
+          <span class="dot">2</span><span class="txt">校对名单</span>
+        </li>
+        <li class="step" data-step="3">
+          <span class="dot">3</span><span class="txt">分配随机数</span>
+        </li>
+        <li class="step" data-step="4">
+          <span class="dot">4</span><span class="txt">排序结果</span>
+        </li>
+      </ol>
+    </nav>
+
+    <div class="workspace">
+      <div class="panel" id="panel">
+
+        <!-- ============ STEP 1 ============ -->
+        <section id="step-1" aria-labelledby="h-1">
+          <div class="panel-head">
+            <h2 id="h-1" tabindex="-1">上传名单文件</h2>
+            <p>支持 <code>.txt</code> 与 <code>.json</code>。单文件，最大 5 MB。</p>
+          </div>
+
+          <div class="dropzone" id="dropzone">
+            <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden>
+            <div class="dz-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4"/><path d="m8 8 4-4 4 4"/>
+                <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+              </svg>
+            </div>
+            <p class="dz-title">把文件拖到这里，或</p>
+            <button class="btn btn-primary" id="pick-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h5l2 2h9a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1Z"/>
+              </svg>
+              选择文件
+            </button>
+            <p class="dz-hint">txt 按换行符切分 · json 读取姓名数组</p>
+          </div>
+
+          <div id="upload-error" class="notice notice-danger" role="alert" hidden style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>
+            </svg>
+            <div class="notice-body" id="upload-error-text"></div>
+          </div>
+
+          <div class="format-grid">
+            <div class="format-card">
+              <h3>txt 格式</h3>
+              <pre>张三
+李四
+王五</pre>
+              <p>每一行一个姓名。空行、行首行尾空格会自动忽略。</p>
+            </div>
+            <div class="format-card">
+              <h3>json 格式</h3>
+              <pre>[
+  { "name": "张三" },
+  { "name": "李四" }
+]</pre>
+              <p>支持字符串数组、对象数组（<code>name</code> / <code>姓名</code> 等字段），或含 <code>names</code>、<code>people</code>、<code>list</code>、<code>data</code> 的嵌套结构。</p>
+            </div>
+          </div>
+
+          <div class="demo-row">
+            <span>暂时没有文件？</span>
+            <button class="link-btn" id="load-sample-txt" type="button">载入示例 txt（12 人）</button>
+            <button class="link-btn" id="load-sample-json" type="button">载入示例 json（8 人 · 含重复）</button>
+          </div>
+        </section>
+
+        <!-- ============ STEP 2 ============ -->
+        <section id="step-2" aria-labelledby="h-2" hidden>
+          <div class="panel-head">
+            <h2 id="h-2" tabindex="-1">校对名单 <span class="step-tag">第 2 步</span></h2>
+            <p>核对是否有漏人、错字或多余条目。直接点击姓名即可修改，改动会同步到最终排序。</p>
+          </div>
+
+          <div class="report" id="parse-report" aria-live="polite"></div>
+
+          <div class="list-toolbar">
+            <div class="toolbar-group">
+              <span class="count-pill" id="people-count">0 人</span>
+              <span class="badge-dup" id="dup-pill" hidden></span>
+            </div>
+            <div class="toolbar-group">
+              <button class="btn btn-sm btn-secondary" id="dedupe-btn" type="button" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                  <path d="m7 7 .8 12a2 2 0 0 0 2 2h4.4a2 2 0 0 0 2-2L17 7"/>
+                  <path d="M10 11v6"/><path d="M14 11v6"/>
+                </svg>
+                去掉重复
+              </button>
+              <button class="btn btn-sm btn-secondary" id="add-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M12 5v14"/><path d="M5 12h14"/>
+                </svg>
+                添加人员
+              </button>
+              <button class="btn btn-sm btn-ghost" id="batch-toggle" type="button" aria-expanded="false" aria-controls="batch-editor">
+                批量编辑
+              </button>
+            </div>
+          </div>
+
+          <div class="batch-editor" id="batch-editor" hidden>
+            <label for="batch-textarea">每行一个姓名（应用后将整体替换当前名单）</label>
+            <textarea id="batch-textarea" spellcheck="false"></textarea>
+            <div class="batch-actions">
+              <button class="btn btn-sm btn-primary" id="batch-apply" type="button">应用</button>
+              <button class="btn btn-sm btn-ghost" id="batch-cancel" type="button">取消</button>
+              <button class="btn btn-sm btn-ghost" id="batch-dedupe" type="button">应用并去重</button>
+            </div>
+          </div>
+
+          <ol class="people" id="people-list" aria-label="人员名单"></ol>
+
+          <p class="notice notice-danger" id="edit-error" role="alert" hidden style="margin-top:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>
+            </svg>
+            <span class="notice-body">存在空白姓名，请填写或删除该行后再继续。</span>
+          </p>
+
+          <div class="panel-actions">
+            <button class="btn btn-ghost" id="back-to-upload" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>
+              </svg>
+              重新上传
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" id="to-confirm" type="button">
+              名单无误，下一步
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- ============ STEP 3 ============ -->
+        <section id="step-3" aria-labelledby="h-3" hidden>
+          <div class="panel-head">
+            <h2 id="h-3" tabindex="-1">确认名单并分配随机数 <span class="step-tag">第 3 步</span></h2>
+            <p>下面是将要参与排序的最终名单。点击「开始随机排序」后，每个人会获得一个互不相同的随机数。</p>
+          </div>
+
+          <dl class="summary-grid" id="confirm-stats"></dl>
+
+          <div class="chips" id="confirm-chips" aria-label="参与排序的人员"></div>
+
+          <div class="notice notice-warn" id="confirm-dup-warn" role="status" hidden style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+            </svg>
+            <span class="notice-body" id="confirm-dup-text"></span>
+          </div>
+
+          <div class="method">
+            <h3>抽取规则</h3>
+            <ul>
+              <li>随机数由浏览器加密安全随机源 <code>crypto.getRandomValues</code> 生成，范围 <code>0.000000 – 0.999999</code>。</li>
+              <li>同一轮内随机数互不相同，不会出现并列名次。</li>
+              <li>默认按随机数<b>从大到小</b>排序；结果页可切换升序，重新排序会重新抽取。</li>
+              <li>返回修改名单后，本次结果作废，需重新生成。</li>
+            </ul>
+          </div>
+
+          <div class="panel-actions">
+            <button class="btn btn-ghost" id="back-to-edit" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>
+              </svg>
+              返回修改
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-primary btn-lg" id="draw-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="4"/>
+                <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
+                <circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/>
+                <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
+                <circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/>
+              </svg>
+              开始随机排序
+            </button>
+          </div>
+        </section>
+
+        <!-- ============ STEP 4 ============ -->
+        <section id="step-4" aria-labelledby="h-4" hidden>
+          <div class="panel-head">
+            <h2 id="h-4" tabindex="-1">排序结果 <span class="step-tag">第 4 步</span></h2>
+            <p id="result-sub">按随机数从大到小排序，第 1 位排在最前。</p>
+          </div>
+
+          <div class="result-toolbar">
+            <div class="segmented" role="group" aria-label="排序方向">
+              <button type="button" data-dir="desc" aria-pressed="true">从大到小</button>
+              <button type="button" data-dir="asc" aria-pressed="false">从小到大</button>
+            </div>
+            <div class="toolbar-group">
+              <button class="btn btn-sm btn-secondary" id="redraw-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/>
+                </svg>
+                重新抽取
+              </button>
+            </div>
+          </div>
+
+          <ol class="results" id="result-list" aria-label="排序结果"></ol>
+
+          <div class="result-foot">
+            <span id="result-meta"></span>
+            <div class="actions">
+              <button class="btn btn-sm btn-secondary" id="copy-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="11" height="11" rx="2"/>
+                  <path d="M5 15V5a2 2 0 0 1 2-2h8"/>
+                </svg>
+                复制结果
+              </button>
+              <button class="btn btn-sm btn-secondary" id="export-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 4v11"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/>
+                </svg>
+                导出 txt
+              </button>
+              <button class="btn btn-sm btn-ghost" id="back-to-edit-2" type="button">返回修改名单</button>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /panel -->
+
+      <aside class="rail" aria-label="状态与说明">
+        <div class="card">
+          <div class="rail-progress" aria-hidden="true"><span id="rail-bar"></span></div>
+          <h3>当前状态</h3>
+          <dl class="stat-list">
+            <div class="stat-row"><dt>进度</dt><dd id="rail-step">1 / 4 · 上传文件</dd></div>
+            <div class="stat-row"><dt>文件</dt><dd id="rail-file" class="muted">尚未上传</dd></div>
+            <div class="stat-row"><dt>名单人数</dt><dd id="rail-count">—</dd></div>
+            <div class="stat-row"><dt>重复姓名</dt><dd id="rail-dup">—</dd></div>
+            <div class="stat-row" id="rail-draw-row" hidden><dt>随机数</dt><dd id="rail-draw">—</dd></div>
+          </dl>
+        </div>
+
+        <div class="card">
+          <h3>解析规则</h3>
+          <ul class="rules">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <span><b>txt</b>：以换行符为分隔，每行一个姓名，空白行忽略。</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <span><b>json</b>：字符串数组，或对象数组中的 <b>name</b> / <b>姓名</b> 字段。</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <span><b>重复姓名</b>默认保留并标记（同名可能是不同的人），可一键去重。</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <span><b>空文件</b>或没有有效姓名时给出提示，不会进入抽取。</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>键盘优先</h3>
+          <ul class="rules">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
+              <span>Tab 移动焦点，Enter 在名单中新增一行。</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+              <span>所有操作均可点击完成，不依赖拖拽。</span>
+            </li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="foot">
+      <span>人员随机排序 · 纯前端单文件实现，无网络请求</span>
+      <span id="foot-note">随机数不使用固定种子，结果不可预测</span>
+    </footer>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<p class="sr-only" id="live" aria-live="polite"></p>
+
+<script>
+/* ============================================================
+   CORE — pure, DOM-free logic (also exercised by tests/parse.test.mjs)
+   ============================================================ */
+/* ==CORE-START== */
+const CORE = (function () {
+  const NAME_KEYS = [
+    'name', '姓名', '名字', '人员姓名', '学生姓名', '成员姓名',
+    'username', 'userName', 'nickname', 'realName', 'fullName',
+    'title', 'label', 'value', '人员', 'name_cn'
+  ];
+  const ARRAY_KEYS = [
+    'names', 'nameList', 'people', 'persons', 'members', 'students',
+    'list', 'items', 'data', 'rows', 'result', 'records',
+    '人员', '名单', '姓名', '数据', '成员'
+  ];
+
+  class ParseError extends Error {
+    constructor(message, hint) {
+      super(message);
+      this.name = 'ParseError';
+      this.hint = hint || '';
+    }
+  }
+
+  function detectKind(fileName) {
+    const name = String(fileName || '').toLowerCase();
+    if (name.endsWith('.txt')) return 'txt';
+    if (name.endsWith('.json')) return 'json';
+    return null;
+  }
+
+  function normalizeKey(name) {
+    return String(name == null ? '' : name)
+      .replace(/[\s\u3000\u00A0]+/g, '')
+      .toLowerCase();
+  }
+
+  function cleanName(value) {
+    return String(value == null ? '' : value)
+      .replace(/\u00A0|\u3000/g, ' ')
+      .trim();
+  }
+
+  function parseTxt(text) {
+    const raw = String(text == null ? '' : text).replace(/^\uFEFF/, '');
+    const lines = raw.split(/\r\n|\r|\n/);
+    const names = [];
+    let emptyLines = 0;
+    for (const line of lines) {
+      const value = cleanName(line);
+      if (!value) { emptyLines += 1; continue; }
+      names.push(value);
+    }
+    return { names, emptyLines, skipped: 0 };
+  }
+
+  function pickNameFromObject(obj) {
+    for (const key of NAME_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const v = obj[key];
+        if (typeof v === 'string' || typeof v === 'number') {
+          const cleaned = cleanName(v);
+          if (cleaned) return cleaned;
+        }
+      }
+    }
+    return null;
+  }
+
+  function collectFromValue(node, out) {
+    if (node === null || node === undefined) { out.skipped += 1; return; }
+    if (typeof node === 'string' || typeof node === 'number') {
+      const cleaned = cleanName(node);
+      if (cleaned) out.names.push(cleaned); else out.skipped += 1;
+      return;
+    }
+    if (Array.isArray(node)) {
+      if (!node.length) { out.skipped += 1; return; }
+      node.forEach((item) => collectFromValue(item, out));
+      return;
+    }
+    if (typeof node === 'object') {
+      const picked = pickNameFromObject(node);
+      if (picked) { out.names.push(picked); } else { out.skipped += 1; }
+      return;
+    }
+    out.skipped += 1;
+  }
+
+  function findArray(node, depth) {
+    depth = depth || 0;
+    if (depth > 4 || node === null || typeof node !== 'object') return null;
+    if (Array.isArray(node)) return node;
+    for (const key of ARRAY_KEYS) {
+      if (Array.isArray(node[key])) return node[key];
+    }
+    for (const key of Object.keys(node)) {
+      if (Array.isArray(node[key])) return node[key];
+    }
+    for (const key of Object.keys(node)) {
+      const child = node[key];
+      if (child && typeof child === 'object') {
+        const found = findArray(child, depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function parseJson(text) {
+    const raw = String(text == null ? '' : text).replace(/^\uFEFF/, '').trim();
+    if (!raw) throw new ParseError('文件内容为空。', '请选择包含人员名单的 json 文件。');
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (err) {
+      throw new ParseError('JSON 格式有误：' + err.message, '请检查引号、逗号与括号是否配对。');
+    }
+    const out = { names: [], skipped: 0, emptyLines: 0 };
+    if (Array.isArray(data)) {
+      data.forEach((item) => collectFromValue(item, out));
+    } else if (data && typeof data === 'object') {
+      const arr = findArray(data, 0);
+      if (arr) {
+        arr.forEach((item) => collectFromValue(item, out));
+      } else {
+        const single = pickNameFromObject(data);
+        if (single) out.names.push(single); else out.skipped += 1;
+      }
+    } else {
+      throw new ParseError('JSON 顶层不是数组或对象，无法读取名单。', '示例：[{"name":"张三"},{"name":"李四"}]');
+    }
+    return out;
+  }
+
+  function parseFileText(text, kind) {
+    if (kind === 'txt') return parseTxt(text);
+    if (kind === 'json') return parseJson(text);
+    throw new ParseError('不支持的文件类型。', '仅支持 .txt 与 .json。');
+  }
+
+  /** Map of normalized name -> { count, display } for names appearing more than once. */
+  function findDuplicates(names) {
+    const map = new Map();
+    for (const name of names) {
+      const key = normalizeKey(name);
+      if (!key) continue;
+      const entry = map.get(key);
+      if (entry) entry.count += 1;
+      else map.set(key, { count: 1, display: name });
+    }
+    const dups = new Map();
+    for (const [key, entry] of map) if (entry.count > 1) dups.set(key, entry);
+    return dups;
+  }
+
+  function dedupeNames(names) {
+    const seen = new Set();
+    const kept = [];
+    let removed = 0;
+    for (const name of names) {
+      const key = normalizeKey(name);
+      if (key && seen.has(key)) { removed += 1; continue; }
+      if (key) seen.add(key);
+      kept.push(name);
+    }
+    return { names: kept, removed };
+  }
+
+  function defaultRandomInt(max) {
+    const cryptoObj = typeof crypto !== 'undefined' ? crypto : null;
+    if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+      const buf = new Uint32Array(1);
+      cryptoObj.getRandomValues(buf);
+      return buf[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+  }
+
+  /**
+   * Assign a unique random number in [0, 999999] to every person.
+   * randomInt is injectable so tests can be deterministic.
+   */
+  function buildDraws(people, randomInt) {
+    const rnd = randomInt || defaultRandomInt;
+    const MAX = 1000000;
+    const used = new Set();
+    return people.map((person) => {
+      let value = rnd(MAX);
+      let guard = 0;
+      while (used.has(value) && guard < MAX) { value = rnd(MAX); guard += 1; }
+      used.add(value);
+      return { id: person.id, name: person.name, value };
+    });
+  }
+
+  function rankDraws(draws, direction) {
+    const dir = direction === 'asc' ? 'asc' : 'desc';
+    const sorted = draws.slice().sort((a, b) => {
+      if (a.value === b.value) return 0;
+      return dir === 'asc' ? a.value - b.value : b.value - a.value;
+    });
+    return sorted.map((d, i) => ({ ...d, rank: i + 1 }));
+  }
+
+  function formatValue(value) {
+    return (value / 1000000).toFixed(6);
+  }
+
+  function formatDateTime(date) {
+    const d = date || new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function toResultText(ranked, meta) {
+    meta = meta || {};
+    const dirLabel = meta.direction === 'asc' ? '从小到大' : '从大到小';
+    const lines = [];
+    lines.push('人员随机排序结果（随机数' + dirLabel + '）');
+    if (meta.fileName) lines.push('来源文件：' + meta.fileName);
+    lines.push('生成时间：' + formatDateTime(meta.date));
+    lines.push('参与人数：' + ranked.length);
+    lines.push('');
+    const width = String(ranked.length).length;
+    ranked.forEach((row) => {
+      const rank = String(row.rank).padStart(width, ' ');
+      lines.push('第 ' + rank + ' 位\t' + row.name + '\t随机数 ' + formatValue(row.value));
+    });
+    lines.push('');
+    lines.push('随机数由浏览器 crypto.getRandomValues 生成，同一轮内互不相同。');
+    return lines.join('\n');
+  }
+
+  return {
+    ParseError, detectKind, normalizeKey, cleanName,
+    parseTxt, parseJson, parseFileText,
+    findDuplicates, dedupeNames,
+    defaultRandomInt, buildDraws, rankDraws,
+    formatValue, formatDateTime, toResultText
+  };
+})();
+/* ==CORE-END== */
+
+/* ============================================================
+   UI
+   ============================================================ */
+(function () {
+  'use strict';
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const MAX_SIZE = 5 * 1024 * 1024;
+
+  const SAMPLE_TXT = [
+    '张伟', '王芳', '李娜', '刘洋', '陈静', '杨帆',
+    '赵敏', '黄磊', '周涛', '吴倩', '徐磊', '孙悦'
+  ].join('\n');
+
+  const SAMPLE_JSON = JSON.stringify([
+    { name: '林清' }, { name: '何以琛' }, { name: '赵默笙' },
+    { name: '林清' }, { name: '沈知遥' }, { name: '陆行舟' },
+    { name: '苏晚' }, { name: '顾南舟' }
+  ], null, 2);
+
+  const state = {
+    step: 1,
+    people: [],
+    file: null,
+    report: { emptyLines: 0, skipped: 0, kind: 'txt' },
+    draws: [],
+    direction: 'desc',
+    confirmed: false, // 只有显式点「名单无误，下一步」后才置 true
+    seq: 0
+  };
+
+  const el = {
+    steps: $('#steps'),
+    panel: $('#panel'),
+    sections: { 1: $('#step-1'), 2: $('#step-2'), 3: $('#step-3'), 4: $('#step-4') },
+    headings: { 1: $('#h-1'), 2: $('#h-2'), 3: $('#h-3'), 4: $('#h-4') },
+    dropzone: $('#dropzone'),
+    fileInput: $('#file-input'),
+    pickBtn: $('#pick-btn'),
+    uploadError: $('#upload-error'),
+    uploadErrorText: $('#upload-error-text'),
+    parseReport: $('#parse-report'),
+    peopleList: $('#people-list'),
+    peopleCount: $('#people-count'),
+    dupPill: $('#dup-pill'),
+    dedupeBtn: $('#dedupe-btn'),
+    addBtn: $('#add-btn'),
+    batchToggle: $('#batch-toggle'),
+    batchEditor: $('#batch-editor'),
+    batchText: $('#batch-textarea'),
+    batchApply: $('#batch-apply'),
+    batchCancel: $('#batch-cancel'),
+    batchDedupe: $('#batch-dedupe'),
+    editError: $('#edit-error'),
+    toConfirm: $('#to-confirm'),
+    drawBtn: $('#draw-btn'),
+    confirmStats: $('#confirm-stats'),
+    confirmChips: $('#confirm-chips'),
+    confirmDupWarn: $('#confirm-dup-warn'),
+    confirmDupText: $('#confirm-dup-text'),
+    resultList: $('#result-list'),
+    resultSub: $('#result-sub'),
+    resultMeta: $('#result-meta'),
+    railStep: $('#rail-step'),
+    railFile: $('#rail-file'),
+    railCount: $('#rail-count'),
+    railDup: $('#rail-dup'),
+    railDrawRow: $('#rail-draw-row'),
+    railDraw: $('#rail-draw'),
+    railBar: $('#rail-bar'),
+    toast: $('#toast'),
+    live: $('#live')
+  };
+
+  const STEP_LABELS = ['上传文件', '校对名单', '分配随机数', '排序结果'];
+
+  /* ---------- helpers ---------- */
+  let toastTimer = null;
+  function toast(message) {
+    // 捕获/演示模式下不弹提示，避免遮挡截图与自动化校验
+    if (document.documentElement.classList.contains('demo-mode')) return;
+    el.toast.textContent = message;
+    el.toast.classList.add('is-on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('is-on'), 2200);
+  }
+  function announce(message) {
+    el.live.textContent = '';
+    requestAnimationFrame(() => { el.live.textContent = message; });
+  }
+  function reduceMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+  function nextId() {
+    state.seq += 1;
+    return 'p' + state.seq;
+  }
+  function duplicatesOf(names) {
+    return CORE.findDuplicates(names);
+  }
+  function currentNames() {
+    return state.people.map((p) => p.name);
+  }
+  function hasBlank() {
+    return state.people.some((p) => !p.name.trim());
+  }
+
+  /* ---------- step switching ---------- */
+  function goTo(step, options) {
+    const opts = options || {};
+    state.step = step;
+
+    Object.keys(el.sections).forEach((key) => {
+      el.sections[key].hidden = Number(key) !== step;
+    });
+    $$('.step', el.steps).forEach((li) => {
+      const n = Number(li.dataset.step);
+      li.classList.toggle('is-current', n === step);
+      li.classList.toggle('is-done', n < step);
+      if (n === step) li.setAttribute('aria-current', 'step');
+      else li.removeAttribute('aria-current');
+    });
+    el.steps.style.setProperty('--progress', String((step - 1) / 3));
+
+    if (step === 2) renderEditList();
+    if (step === 3) renderConfirm();
+    if (step === 4) renderResults(opts.animate !== false);
+
+    // prevent stale step content being read by AT
+    Object.keys(el.sections).forEach((key) => {
+      el.sections[key].setAttribute('aria-hidden', Number(key) === step ? 'false' : 'true');
+    });
+
+    const heading = el.headings[step];
+    if (heading) heading.focus({ preventScroll: true });
+    if (!opts.keepScroll) {
+      const top = el.panel.getBoundingClientRect().top + window.scrollY - 84;
+      window.scrollTo({ top: Math.max(top, 0), behavior: reduceMotion() ? 'auto' : 'smooth' });
+    }
+    announce('当前步骤：' + STEP_LABELS[step - 1]);
+    updateRail();
+  }
+
+  function updateRail() {
+    el.railBar.style.width = (state.step / 4 * 100) + '%';
+    el.railStep.textContent = state.step + ' / 4 · ' + STEP_LABELS[state.step - 1];
+    el.railFile.textContent = state.file ? state.file.name : '尚未上传';
+    el.railFile.classList.toggle('muted', !state.file);
+
+    if (state.people.length) {
+      el.railCount.textContent = state.people.length + ' 人';
+    } else {
+      el.railCount.textContent = '—';
+    }
+    const dups = duplicatesOf(currentNames());
+    const dupCount = Array.from(dups.values()).reduce((sum, d) => sum + (d.count - 1), 0);
+    el.railDup.textContent = state.people.length ? (dupCount ? dupCount + ' 个' : '无') : '—';
+    el.railDup.classList.toggle('muted', !dupCount);
+
+    if (state.draws.length) {
+      el.railDrawRow.hidden = false;
+      el.railDraw.textContent = state.draws.length + ' 个 · 互不重复';
+    } else {
+      el.railDrawRow.hidden = true;
+    }
+  }
+
+  /* ---------- upload ---------- */
+  function showUploadError(message, hint) {
+    el.uploadErrorText.innerHTML = '';
+    const strong = document.createElement('strong');
+    strong.textContent = message;
+    el.uploadErrorText.appendChild(strong);
+    if (hint) {
+      el.uploadErrorText.appendChild(document.createTextNode(' ' + hint));
+    }
+    el.uploadError.hidden = false;
+    announce('解析失败：' + message);
+    el.uploadError.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+  function clearUploadError() {
+    el.uploadError.hidden = true;
+    el.uploadErrorText.textContent = '';
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    clearUploadError();
+
+    const kind = CORE.detectKind(file.name);
+    if (!kind) {
+      showUploadError('不支持的文件类型。', '仅支持 .txt 与 .json，当前文件为「' + file.name + '」。');
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      showUploadError('文件过大。', '请上传小于 5 MB 的名单文件（当前 ' + (file.size / 1024 / 1024).toFixed(1) + ' MB）。');
+      return;
+    }
+    if (file.size === 0) {
+      showUploadError('文件是空的。', '请检查文件内容后重新上传。');
+      return;
+    }
+
+    let text = '';
+    try {
+      text = await file.text();
+    } catch (err) {
+      showUploadError('无法读取文件。', '请重试或换一个文件。');
+      return;
+    }
+
+    applyParsedText(text, kind, file.name, { size: file.size });
+  }
+
+  function applyParsedText(text, kind, fileName, meta) {
+    let result;
+    try {
+      result = CORE.parseFileText(text, kind);
+    } catch (err) {
+      const message = err && err.message ? err.message : '解析失败。';
+      showUploadError(message, err && err.hint ? err.hint : '');
+      return;
+    }
+
+    if (!result.names.length) {
+      showUploadError(
+        '没有解析到任何有效姓名。',
+        kind === 'txt'
+          ? '这个 txt 里只有空行或空白字符，换行分隔的每一行都需要是一个姓名。'
+          : '这个 json 里没有可识别的姓名数组，请参考示例结构。'
+      );
+      return;
+    }
+
+    state.people = result.names.map((name) => ({ id: nextId(), name }));
+    state.file = { name: fileName, size: meta && meta.size ? meta.size : 0, kind };
+    state.report = { emptyLines: result.emptyLines, skipped: result.skipped, kind };
+    state.draws = [];
+    state.direction = 'desc';
+    state.confirmed = false;
+
+    goTo(2);
+    const parts = ['已解析 ' + state.people.length + ' 人'];
+    if (result.emptyLines) parts.push('忽略 ' + result.emptyLines + ' 行空白');
+    if (result.skipped) parts.push('跳过 ' + result.skipped + ' 条无效数据');
+    toast(parts.join(' · '));
+  }
+
+  /* ---------- step 2: editable list ---------- */
+  function renderReport() {
+    const dupMap = duplicatesOf(currentNames());
+    const dupExtra = Array.from(dupMap.values()).reduce((s, d) => s + (d.count - 1), 0);
+    el.parseReport.innerHTML = '';
+
+    const add = (node) => el.parseReport.appendChild(node);
+    const text = (value, bold) => {
+      const span = document.createElement(bold ? 'b' : 'span');
+      span.textContent = value;
+      return span;
+    };
+
+    if (state.file) {
+      const name = document.createElement('span');
+      name.className = 'file-name';
+      name.textContent = state.file.name;
+      name.title = state.file.name;
+      add(name);
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = '/';
+      add(sep);
+    }
+    add(text('共 ' + state.people.length + ' 人', true));
+    if (state.report.emptyLines) {
+      add(text('· ' + state.report.emptyLines + ' 行空白已忽略'));
+    }
+    if (state.report.skipped) {
+      add(text('· 跳过 ' + state.report.skipped + ' 条无效数据'));
+    }
+    if (dupExtra) {
+      add(text('· ' + dupExtra + ' 个重复姓名', true));
+    }
+  }
+
+  function renderEditList() {
+    el.peopleList.innerHTML = '';
+    if (!state.people.length) {
+      const empty = document.createElement('li');
+      empty.className = 'list-empty';
+      empty.textContent = '名单是空的。点击「添加人员」手动录入，或返回上一步重新上传文件。';
+      el.peopleList.appendChild(empty);
+      updateEditSummary();
+      return;
+    }
+    state.people.forEach((person, index) => {
+      el.peopleList.appendChild(buildPersonRow(person, index));
+    });
+    updateEditSummary();
+    if (!el.batchEditor.hidden) syncBatchText();
+  }
+
+  function buildPersonRow(person, index) {
+    const li = document.createElement('li');
+    li.className = 'person-row';
+    li.dataset.id = person.id;
+
+    const idx = document.createElement('span');
+    idx.className = 'idx';
+    idx.textContent = String(index + 1);
+    idx.setAttribute('aria-hidden', 'true');
+
+    const input = document.createElement('input');
+    input.className = 'name-input';
+    input.type = 'text';
+    input.value = person.name;
+    input.maxLength = 80;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.dataset.action = 'name';
+    input.setAttribute('aria-label', '第 ' + (index + 1) + ' 位人员姓名');
+    input.addEventListener('input', () => {
+      person.name = input.value;
+      updateEditSummary();
+      validateRow(li, person);
+    });
+    input.addEventListener('blur', () => {
+      const trimmed = person.name.trim();
+      if (trimmed !== input.value) {
+        person.name = trimmed;
+        input.value = trimmed;
+        updateEditSummary();
+      }
+      validateRow(li, person);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        insertAfter(person.id);
+      }
+    });
+
+    const side = document.createElement('div');
+    side.className = 'row-side';
+
+    const dupBadge = document.createElement('span');
+    dupBadge.className = 'badge-dup';
+    dupBadge.dataset.role = 'dup';
+    dupBadge.hidden = true;
+
+    const del = document.createElement('button');
+    del.className = 'icon-btn danger';
+    del.type = 'button';
+    del.title = '删除该人员';
+    del.setAttribute('aria-label', '删除第 ' + (index + 1) + ' 位 ' + (person.name || '空白姓名'));
+    del.dataset.action = 'delete';
+    del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="m7 7 .8 12a2 2 0 0 0 2 2h4.4a2 2 0 0 0 2-2L17 7"/></svg>';
+    del.addEventListener('click', () => removePerson(person.id, index));
+
+    side.append(dupBadge, del);
+    li.append(idx, input, side);
+
+    const err = document.createElement('p');
+    err.className = 'row-error';
+    err.hidden = true;
+    err.textContent = '姓名不能为空';
+    li.appendChild(err);
+
+    validateRow(li, person);
+    return li;
+  }
+
+  function validateRow(li, person) {
+    const input = $('input', li);
+    const err = $('.row-error', li);
+    const blank = !person.name.trim();
+    input.setAttribute('aria-invalid', blank ? 'true' : 'false');
+    err.hidden = !blank;
+    if (blank) {
+      err.id = 'err-' + person.id;
+      input.setAttribute('aria-describedby', err.id);
+    } else {
+      input.removeAttribute('aria-describedby');
+    }
+  }
+
+  function updateEditSummary() {
+    const names = currentNames();
+    const dupMap = duplicatesOf(names);
+    const dupExtra = Array.from(dupMap.values()).reduce((s, d) => s + (d.count - 1), 0);
+
+    el.peopleCount.textContent = state.people.length + ' 人';
+    el.dupPill.hidden = !dupExtra;
+    el.dupPill.textContent = dupExtra + ' 个重复姓名';
+    el.dedupeBtn.hidden = !dupExtra;
+
+    // badges are updated in place so typing never loses focus
+    $$('.person-row', el.peopleList).forEach((li) => {
+      const id = li.dataset.id;
+      const person = state.people.find((p) => p.id === id);
+      if (!person) return;
+      const badge = $('[data-role="dup"]', li);
+      const entry = dupMap.get(CORE.normalizeKey(person.name));
+      if (entry) {
+        badge.hidden = false;
+        badge.textContent = '重复 ×' + entry.count;
+      } else {
+        badge.hidden = true;
+        badge.textContent = '';
+      }
+      const idx = $('.idx', li);
+      const position = state.people.indexOf(person) + 1;
+      idx.textContent = String(position);
+      const input = $('input', li);
+      input.setAttribute('aria-label', '第 ' + position + ' 位人员姓名');
+    });
+
+    const blank = hasBlank();
+    el.editError.hidden = !blank;
+    el.toConfirm.disabled = !state.people.length || blank;
+    el.toConfirm.title = blank ? '请先填写或删除空白姓名' : '';
+    renderReport();
+    updateRail();
+  }
+
+  function syncBatchText() {
+    el.batchText.value = state.people.map((p) => p.name).join('\n');
+  }
+
+  function insertAfter(id) {
+    const index = state.people.findIndex((p) => p.id === id);
+    const person = { id: nextId(), name: '' };
+    if (index === -1) state.people.push(person);
+    else state.people.splice(index + 1, 0, person);
+    renderEditList();
+    const row = $('.person-row[data-id="' + person.id + '"]', el.peopleList);
+    if (row) {
+      const input = $('input', row);
+      input.focus();
+      input.select();
+      row.scrollIntoView({ block: 'nearest' });
+    }
+    announce('已在第 ' + (index + 2) + ' 行插入空白行');
+  }
+
+  function addPerson() {
+    const person = { id: nextId(), name: '' };
+    state.people.push(person);
+    renderEditList();
+    const row = $('.person-row[data-id="' + person.id + '"]', el.peopleList);
+    if (row) {
+      const input = $('input', row);
+      input.focus();
+      row.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    }
+    announce('已添加一行，共 ' + state.people.length + ' 人');
+  }
+
+  function removePerson(id, index) {
+    state.people = state.people.filter((p) => p.id !== id);
+    renderEditList();
+    const rows = $$('.person-row', el.peopleList);
+    if (!rows.length) {
+      el.addBtn.focus();
+    } else {
+      const target = rows[Math.min(index, rows.length - 1)];
+      const input = $('input', target);
+      input.focus();
+      input.select();
+    }
+    announce('已删除 1 人，剩余 ' + state.people.length + ' 人');
+  }
+
+  function dedupe(showToast) {
+    const result = CORE.dedupeNames(state.people.map((p) => p.name));
+    if (!result.removed) return 0;
+    const kept = [];
+    const seen = new Set();
+    state.people.forEach((person) => {
+      const key = CORE.normalizeKey(person.name);
+      if (key && seen.has(key)) return;
+      if (key) seen.add(key);
+      kept.push(person);
+    });
+    state.people = kept;
+    renderEditList();
+    if (showToast) toast('已去除 ' + result.removed + ' 个重复姓名');
+    announce('已去除 ' + result.removed + ' 个重复姓名，剩余 ' + state.people.length + ' 人');
+    return result.removed;
+  }
+
+  function applyBatch(withDedupe) {
+    const lines = el.batchText.value.split(/\r\n|\r|\n/);
+    const names = lines.map((l) => l.trim()).filter(Boolean);
+    if (!names.length) {
+      toast('名单不能为空');
+      el.batchText.focus();
+      return;
+    }
+    state.people = names.map((name) => ({ id: nextId(), name }));
+    if (withDedupe) dedupe(false);
+    el.batchEditor.hidden = true;
+    el.batchToggle.setAttribute('aria-expanded', 'false');
+    el.batchToggle.textContent = '批量编辑';
+    renderEditList();
+    toast('已更新名单，共 ' + state.people.length + ' 人');
+    announce('批量编辑已应用，共 ' + state.people.length + ' 人');
+  }
+
+  /* ---------- step 3 ---------- */
+  function renderConfirm() {
+    const names = currentNames();
+    const dupMap = duplicatesOf(names);
+    const dupExtra = Array.from(dupMap.values()).reduce((s, d) => s + (d.count - 1), 0);
+
+    el.confirmStats.innerHTML = '';
+    const stats = [
+      { label: '参与人数', value: names.length + ' 人', small: false },
+      { label: '重复姓名', value: dupExtra ? dupExtra + ' 个' : '无', small: false },
+      { label: '来源文件', value: state.file ? state.file.name : '手动录入', small: true }
+    ];
+    stats.forEach((item) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'summary-item';
+      const dt = document.createElement('dt');
+      dt.textContent = item.label;
+      const dd = document.createElement('dd');
+      dd.textContent = item.value;
+      if (item.small) dd.className = 'small';
+      dd.title = item.value;
+      wrap.append(dt, dd);
+      el.confirmStats.appendChild(wrap);
+    });
+
+    el.confirmChips.innerHTML = '';
+    const limit = 120;
+    state.people.slice(0, limit).forEach((person) => {
+      const key = CORE.normalizeKey(person.name);
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (dupMap.has(key) ? ' is-dup' : '');
+      const inner = document.createElement('span');
+      inner.textContent = person.name;
+      chip.appendChild(inner);
+      el.confirmChips.appendChild(chip);
+    });
+    if (names.length > limit) {
+      const more = document.createElement('span');
+      more.className = 'chips-more';
+      more.textContent = '… 还有 ' + (names.length - limit) + ' 人';
+      el.confirmChips.appendChild(more);
+    }
+
+    if (dupExtra) {
+      el.confirmDupWarn.hidden = false;
+      const list = Array.from(dupMap.values())
+        .slice(0, 3)
+        .map((d) => d.display + ' ×' + d.count)
+        .join('、');
+      el.confirmDupText.textContent = '名单中有 ' + dupExtra + ' 个重复姓名（' + list +
+        (dupMap.size > 3 ? ' 等' : '') + '）。若实为同一人，请返回修改或去重；若是不同的人，可直接继续。';
+    } else {
+      el.confirmDupWarn.hidden = true;
+    }
+    el.drawBtn.disabled = !state.people.length;
+    updateRail();
+  }
+
+  /* ---------- step 4 ---------- */
+  function renderResults(animate) {
+    const ranked = CORE.rankDraws(state.draws, state.direction);
+    state.ranked = ranked;
+    el.resultList.innerHTML = '';
+
+    const dupMap = duplicatesOf(ranked.map((r) => r.name));
+    const frag = document.createDocumentFragment();
+    ranked.forEach((row, index) => {
+      const li = document.createElement('li');
+      li.className = 'result-row';
+      li.style.setProperty('--v', (row.value / 1000000).toFixed(4));
+      li.style.setProperty('--i', animate ? String(Math.min(index, 24)) : '0');
+
+      const rank = document.createElement('div');
+      rank.className = 'rank' + (row.rank <= 3 ? ' top' : '');
+      rank.textContent = String(row.rank);
+      rank.setAttribute('aria-hidden', 'true');
+
+      const main = document.createElement('div');
+      main.className = 'result-main';
+      const name = document.createElement('div');
+      name.className = 'result-name';
+      name.textContent = row.name;
+      if (dupMap.has(CORE.normalizeKey(row.name))) {
+        const mark = document.createElement('span');
+        mark.className = 'dup-mark';
+        mark.textContent = '同名';
+        mark.title = '名单中存在同名人员';
+        name.appendChild(mark);
+      }
+      main.appendChild(name);
+
+      const num = document.createElement('div');
+      num.className = 'result-num';
+      num.textContent = CORE.formatValue(row.value);
+      num.title = '随机数 ' + CORE.formatValue(row.value);
+
+      li.setAttribute('aria-label', '第 ' + row.rank + ' 位，' + row.name + '，随机数 ' + CORE.formatValue(row.value));
+      li.append(rank, main, num);
+      frag.appendChild(li);
+    });
+    el.resultList.appendChild(frag);
+
+    const dirLabel = state.direction === 'asc' ? '从小到大' : '从大到小';
+    el.resultSub.textContent = '按随机数从' + (state.direction === 'asc' ? '小' : '大') +
+      '到' + (state.direction === 'asc' ? '大' : '小') + '排序，第 1 位排在最前。';
+    el.resultMeta.textContent = ranked.length + ' 人 · 随机数' + dirLabel + ' · 生成于 ' +
+      CORE.formatDateTime(state.drawAt);
+
+    $$('.segmented button').forEach((btn) => {
+      btn.setAttribute('aria-pressed', btn.dataset.dir === state.direction ? 'true' : 'false');
+    });
+    updateRail();
+    if (animate) {
+      const first = $('.result-row', el.resultList);
+      if (first) first.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function draw() {
+    // 双保险：只有用户在第 3 步点击「名单无误，下一步」确认后，才允许抽取
+    if (!state.confirmed) return;
+    if (!state.people.length || hasBlank()) return;
+    state.draws = CORE.buildDraws(state.people);
+    state.drawAt = new Date();
+    goTo(4, { animate: !reduceMotion() });
+    announce('已为 ' + state.draws.length + ' 人生成随机数并完成排序');
+  }
+
+  function copyResult() {
+    const text = CORE.toResultText(state.ranked || [], {
+      direction: state.direction,
+      fileName: state.file ? state.file.name : '',
+      date: state.drawAt
+    });
+    const done = () => toast('已复制排序结果');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+  function fallbackCopy(text, done) {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try {
+      document.execCommand('copy');
+      done();
+    } catch (err) {
+      toast('复制失败，请手动选择文本');
+    }
+    document.body.removeChild(area);
+  }
+
+  function exportResult() {
+    const text = CORE.toResultText(state.ranked || [], {
+      direction: state.direction,
+      fileName: state.file ? state.file.name : '',
+      date: state.drawAt
+    });
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = CORE.formatDateTime(new Date()).replace(/[-: ]/g, '');
+    a.href = url;
+    a.download = '随机排序结果_' + stamp + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('已导出 txt 文件');
+  }
+
+  /* ---------- reset flows ---------- */
+  function backToEdit() {
+    state.draws = [];
+    state.ranked = [];
+    state.confirmed = false; // 回到名单页后需要重新确认才能再次抽取
+    goTo(2);
+    toast('已返回修改，之前的随机结果已作废');
+  }
+  function resetAll() {
+    state.people = [];
+    state.file = null;
+    state.draws = [];
+    state.ranked = [];
+    state.confirmed = false;
+    state.report = { emptyLines: 0, skipped: 0, kind: 'txt' };
+    el.fileInput.value = '';
+    clearUploadError();
+    el.batchEditor.hidden = true;
+    el.batchToggle.setAttribute('aria-expanded', 'false');
+    el.batchToggle.textContent = '批量编辑';
+    goTo(1);
+  }
+
+  /* ---------- events ---------- */
+  el.pickBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    el.fileInput.click();
+  });
+  el.dropzone.addEventListener('click', () => el.fileInput.click());
+  el.dropzone.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      el.fileInput.click();
+    }
+  });
+  el.dropzone.setAttribute('role', 'group');
+  el.dropzone.setAttribute('aria-label', '上传名单文件');
+
+  el.fileInput.addEventListener('change', () => {
+    const file = el.fileInput.files && el.fileInput.files[0];
+    if (file) handleFile(file);
+    el.fileInput.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach((type) => {
+    el.dropzone.addEventListener(type, (event) => {
+      event.preventDefault();
+      el.dropzone.classList.add('is-drag');
+    });
+  });
+  ['dragleave', 'dragend', 'drop'].forEach((type) => {
+    el.dropzone.addEventListener(type, (event) => {
+      event.preventDefault();
+      el.dropzone.classList.remove('is-drag');
+    });
+  });
+  el.dropzone.addEventListener('drop', (event) => {
+    const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
+
+  $('#load-sample-txt').addEventListener('click', () => {
+    applyParsedText(SAMPLE_TXT, 'txt', '示例名单.txt', { size: SAMPLE_TXT.length });
+  });
+  $('#load-sample-json').addEventListener('click', () => {
+    applyParsedText(SAMPLE_JSON, 'json', '示例名单.json', { size: SAMPLE_JSON.length });
+  });
+
+  el.addBtn.addEventListener('click', addPerson);
+  el.dedupeBtn.addEventListener('click', () => dedupe(true));
+  el.batchToggle.addEventListener('click', () => {
+    const open = el.batchEditor.hidden;
+    el.batchEditor.hidden = !open;
+    el.batchToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    el.batchToggle.textContent = open ? '收起批量编辑' : '批量编辑';
+    if (open) {
+      syncBatchText();
+      el.batchText.focus();
+      el.batchText.setSelectionRange(el.batchText.value.length, el.batchText.value.length);
+    }
+  });
+  el.batchApply.addEventListener('click', () => applyBatch(false));
+  el.batchDedupe.addEventListener('click', () => applyBatch(true));
+  el.batchCancel.addEventListener('click', () => {
+    el.batchEditor.hidden = true;
+    el.batchToggle.setAttribute('aria-expanded', 'false');
+    el.batchToggle.textContent = '批量编辑';
+    el.batchToggle.focus();
+  });
+
+  $('#back-to-upload').addEventListener('click', resetAll);
+  el.toConfirm.addEventListener('click', () => {
+    if (!state.people.length) { toast('名单是空的，请先添加人员'); return; }
+    if (hasBlank()) {
+      el.editError.hidden = false;
+      const firstEmpty = state.people.find((p) => !p.name.trim());
+      const row = firstEmpty && $('.person-row[data-id="' + firstEmpty.id + '"]', el.peopleList);
+      if (row) $('input', row).focus();
+      return;
+    }
+    state.confirmed = true;
+    goTo(3);
+  });
+
+  $('#back-to-edit').addEventListener('click', backToEdit);
+  $('#back-to-edit-2').addEventListener('click', backToEdit);
+  el.drawBtn.addEventListener('click', draw);
+  $('#redraw-btn').addEventListener('click', () => {
+    if (!state.people.length) return;
+    draw();
+    toast('已重新抽取随机数');
+  });
+  $('#copy-btn').addEventListener('click', copyResult);
+  $('#export-btn').addEventListener('click', exportResult);
+
+  $$('.segmented button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.direction = btn.dataset.dir;
+      renderResults(false);
+      announce(state.direction === 'asc' ? '已切换为从小到大排序' : '已切换为从大到小排序');
+    });
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !el.batchEditor.hidden) {
+      el.batchEditor.hidden = true;
+      el.batchToggle.setAttribute('aria-expanded', 'false');
+      el.batchToggle.textContent = '批量编辑';
+      el.batchToggle.focus();
+    }
+  });
+
+  /* ---------- boot ---------- */
+  const params = new URLSearchParams(location.search);
+  if (params.has('demo')) {
+    document.documentElement.classList.add('demo-mode');
+  }
+  goTo(1, { keepScroll: true });
+
+  // Demo/deep-link hooks used for visual regression captures.
+  const view = params.get('view');
+  if (view) {
+    if (view === 'edit' || view === 'confirm' || view === 'result') {
+      applyParsedText(SAMPLE_TXT, 'txt', '示例名单.txt', { size: 120 });
+      if (view === 'confirm') { state.confirmed = true; goTo(3, { keepScroll: true }); }
+      if (view === 'result') {
+        let seed = 20261020;
+        const seeded = () => {
+          seed = (seed * 1664525 + 1013904223) % 4294967296;
+          return seed % 1000000;
+        };
+        state.people = state.people.concat([
+          { id: nextId(), name: '张伟' }, { id: nextId(), name: '郑一诺' }
+        ]);
+        state.draws = CORE.buildDraws(state.people, seeded);
+        state.drawAt = new Date();
+        goTo(4, { keepScroll: true, animate: false });
+      }
+    }
+    if (view === 'empty') {
+      goTo(2, { keepScroll: true });
+      toast('演示：空名单状态');
+    }
+  }
+})();
+</script>
+</body>
+</html>

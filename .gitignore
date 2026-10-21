@@ -1,0 +1,22 @@
+# 操作系统 / 资源管理器
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 编辑器 / IDE 本地配置
+.vscode/
+.idea/
+*.swp
+
+# 依赖目录（本项目为单文件纯前端，当前无依赖；预留以防后续引入）
+node_modules/
+npm-debug.log*
+.npm/
+
+# 本地测试与截图临时产物（回归截图时生成，不属于交付内容）
+.shots/
+.edgetmp/
+
+# 本地环境变量
+.env
+.env.*
